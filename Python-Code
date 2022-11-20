@@ -1,0 +1,378 @@
+import pandas as pd
+import altair as alt
+!pip install openpyxl
+import altair as alt
+Deprivation
+
+Der Index auf Kreisebene von 2012 wird eingelesen. Dabei werden 4 Zeilen fallen gelassen, da sie bis 2021 einer Kreisreform unterworfen waren
+gisd = pd.read_excel("Gisd_Kreis_BL.xlsx")
+
+gisd = gisd.reset_index(drop=True)
+
+# 3152, 3153, 3156, 16056 existiert nicht, 
+
+gisd.drop(gisd.index[[20, 21, 24, 384]], inplace =True)
+
+gisd = gisd.set_index('Kreis2012')
+
+
+# Nur für die Forschungsfrage relevante Spalten behalten
+gisd = gisd.drop(columns=["GISD_2012", "GISD5_2012", "GISD_k_2012",])
+Todes- und Krankheitsfälle
+
+Krankheitsfälle auf Kreisebene werden eingelesen, zwei Kreise werden gelöscht, da sie beim GISD nicht existieren (vermutlich die vorher gelöschten 4 Kreise die zusammengefasst wurden)
+infekt = pd.read_csv("Infektionen.csv")
+
+# Nur für die Forschungsfrage relevante Spalten behalten
+infekt = infekt[["datum", "ags5", "kreis", "kr_inf_md_kum"]]
+
+#Die kumulierten Krankheitsfälle am Stichtag
+infekt = infekt.loc[infekt['datum'] == "2021-12-31"]
+
+
+#infekt = infekt.set_index('ags5')
+
+infekt = infekt.reset_index(level=0)
+#Göttingen gibts beim GISD nicht
+
+infekt.drop(infekt.index[[20, 25]], inplace =True)
+
+infekt = infekt.set_index('ags5')
+
+infekt = infekt.drop(columns=["datum", "index"])
+tod = pd.read_csv("Todesfälle.csv")
+
+# Nur für die Forschungsfrage relevante Spalten behalten
+tod = tod[["ags5", "datum", "kr_tod_md_kum"]]
+
+#Die kumulierten Todesfälle am Stichtag
+tod = tod.loc[tod['datum'] == "2021-12-31"]
+
+#Reihe löschen da nur für Stichtagssuche relevant
+
+
+tod = tod.reset_index(level=0)
+#Göttingen gibts beim GISD nicht
+
+tod.drop(tod.index[[20, 25]], inplace =True)
+
+#tod.drop(tod.index[[25]], inplace =True)
+tod = tod.set_index('ags5')
+#tod = tod.reset_index(drop=True)
+
+tod = tod.drop(columns=["datum", "index"])
+Einwohner*innenzahlen
+
+Die Daten zu den Einwohner*innen der Kreise werden eingelesen. Diese werden am Stichtag 31.12.2020 genommen.
+einwohner = pd.read_csv("Einwohner.csv")
+ #Einwohner*innen am 31.12.2020
+einwohner = einwohner[["kreis", "ags5", "kr_ew_20"]]
+
+#Kreis "Eisenach" an Position 383 kam nur hier vor, in keiner anderen Statistik
+einwohner = einwohner.reset_index(drop=True)
+einwohner.drop(einwohner.index[[20, 25, 383]], inplace =True)
+
+einwohner = einwohner.set_index("ags5")
+einwohner = einwohner.drop(columns=["kreis"])
+
+Zusammenführen zu einer Datenbank
+#Zusammenführen der Infektions- und Todesfälle per Kreis
+
+df = pd.concat([tod, infekt], axis=1)
+
+df = df[['kreis',"kr_inf_md_kum",'kr_tod_md_kum']]
+
+
+# Zusammenführen Kreis, Erkrankte, Tote mit Einwohnerzahl
+df = pd.concat ([df, einwohner], axis=1)
+
+
+# Zusammenführen Kreis, Erkrankte, Tote, Einwohnerzahl mit GISD
+df = pd.concat([df, gisd], axis=1)
+
+Berechnungen und Schönheitskorrekturen
+#Ausrechnen der Toten/Erkrankten pro 10.000 Einwohner*innen
+
+df['tod'] =df['kr_tod_md_kum'] / df['kr_ew_20']  * 10000
+
+df["krank"] = df['kr_inf_md_kum'] / df['kr_ew_20']  * 10000
+
+
+df.tod = df.tod.round(decimals = 2)
+df.krank = df.krank.round(decimals = 2)
+
+
+#Falls vorhanden Nullreihen rauswerfen
+nan_rows = df[df["GISD10_2012"].isnull()]
+
+
+zoom = df
+
+Auflistung nach GISD zusammengefasst
+
+Die jeweiligen Kreise mit identischem GISD werden zusammengefasst und für jede ihrer Angaben der Durchschnittswert berechnet
+#Durchschnitt bilden zu den Einzelnen GISD-Werten
+
+df10 = df.loc[(df['GISD10_2012'] == 10)]
+df10 = df10.mean()
+
+df9 = df.loc[(df['GISD10_2012'] == 9)]
+df9 = df9.mean()
+
+df8 = df.loc[(df['GISD10_2012'] == 8)]
+df8 = df8.mean()
+
+df7 = df.loc[(df['GISD10_2012'] == 7)]
+df7 = df7.mean()
+
+df6 = df.loc[(df['GISD10_2012'] == 6)]
+df6 = df6.mean()
+
+df5 = df.loc[(df['GISD10_2012'] == 5)]
+df5 = df5.mean()
+
+df4 = df.loc[(df['GISD10_2012'] == 4)]
+df4 = df4.mean()
+
+df3 = df.loc[(df['GISD10_2012'] == 3)]
+df3 = df3.mean()
+
+df2 = df.loc[(df['GISD10_2012'] == 2)]
+df2 = df2.mean()
+
+df1 = df.loc[(df['GISD10_2012'] == 1)]
+df1 = df1.mean()
+
+Durchnschnittswerte der GISDs zusammenfassen zu einer Tabelle
+dfall= pd.concat ([df1, df2, df3, df4, df5, df6, df7, df8, df9, df10], axis=1)
+
+dfall = dfall.T
+
+dfall = dfall.rename(columns={"GISD10_2012":"GISD 2012", "kr_inf_md_kum":"Kummulierte Erkrankte", "kr_tod_md_kum":"kumulierte Tote", "kr_ew_20": "Einwohner*innen", "tod": "Tote auf 10.000 Einw.", "krank": "Kranke auf 10.000 Einw." })
+
+dfall = dfall.drop(columns=["Unnamed: 6", "Unnamed: 7", "Unnamed: 8"])
+
+stabilität gisd
+
+GISD von Github einlesen und nur die Daten von 1998, 2004, 2012 und 2015 bearbeiten
+
+
+data = pd.read_csv('gisd 1999 bis 2015.csv')
+
+data.Jahr = data.Jahr.astype(str)
+data.KrS = data.KrS.astype(str)
+data = data[["KrS", "Name", "Jahr", "gisd10"]]
+
+stabil1998 = data.loc[data['Jahr'] == "1998"]
+stabil2004 = data.loc[data['Jahr'] == "2004"]
+stabil2012 = data.loc[data['Jahr'] == "2012"]
+stabil2015 = data.loc[data['Jahr'] == "2015"]
+
+stabil1998 = stabil1998.rename(columns={"gisd10":"1998"})
+stabil2004 = stabil2004.rename(columns={"gisd10":"2004"})
+stabil2012 = stabil2012.rename(columns={"gisd10":"2012"})
+stabil2015 = stabil2015.rename(columns={"gisd10":"2015"})
+
+
+stabil2004 = stabil2004.rename(columns={"Name":"Name1"})
+stabil2012 = stabil2012.rename(columns={"Name":"Name2"})
+stabil2015 = stabil2015.rename(columns={"Name":"Name3"})
+
+stabil1998 = stabil1998[["KrS", "Name", "1998"]]
+stabil2004 = stabil2004[["KrS", "Name1", "2004"]]
+stabil2012 = stabil2012[["KrS", "Name2", "2012"]] 
+stabil2015 = stabil2015[["KrS", "Name3", "2015"]]
+
+stabil1998 = stabil1998.set_index('KrS')
+stabil2004 = stabil2004.set_index('KrS')
+stabil2012 = stabil2012.set_index('KrS')
+stabil2015 = stabil2015.set_index('KrS')
+
+
+
+stabil = pd.concat ([stabil1998, stabil2004, stabil2012, stabil2015], axis=1)
+
+stabil = stabil[["Name", "1998", "2004", "2012", "2015"]]
+
+Änderung GISD von 1998 bis 2015
+stabillang = stabil
+
+stabillang["Änderung GISD 1998 - 2015"] = stabillang["1998"] - stabil["2015"]
+stabillang = stabillang[["Name", "Änderung GISD 1998 - 2015"]]
+
+Graphische Darstellung der Änderung des GISD
+bar = alt.Chart(stabillang).mark_bar().encode(
+    x=alt.X("Änderung GISD 1998 - 2015:Q", title = "Veränderung des GISD zwischen 2012 und 2015"),
+    y=alt.Y('Name', title = "Kreis(freie Stadt)"),
+)
+
+rule = alt.Chart(stabillang).mark_rule(color='red').encode(
+    x=alt.X('mean(Änderung GISD 1998 - 2015):Q', title = " "),
+)
+
+
+text = bar.mark_text(
+    align='center',
+    baseline='middle',
+    dx=7  # Nudges text to right so it doesn't appear on top of the bar
+).encode(
+    text="Änderung GISD 1998 - 2015:Q"
+)
+
+
+(bar + text + rule).properties(width=170)
+Bundesländer
+
+In der Datenbank die Kreise der jeweiligen Bundesländer zusammenfassen, die Durchschnittswerte berechnen und in der Datenbank die Zugehörigkeit zu Ost und Westdeutschland hinterlegen
+Brandenburg = zoom[zoom['BL'].str.contains('Brandenburg')]
+
+Brandenburg = Brandenburg.mean()
+Brandenburg["BL"] = "Brandenburg"
+Brandenburg["Teilung"] = "Ost"
+
+Sachsen = zoom[zoom['BL'].str.contains('Sachsen.')]
+Sachsen = Sachsen.mean()
+Sachsen["BL"] = "Sachsen"
+Sachsen["Teilung"] = "Ost"
+
+Mecklenburg = zoom[zoom['BL'].str.contains('Mecklenburg')]
+Mecklenburg = Mecklenburg.mean()
+Mecklenburg["BL"] = "Mecklenburg_Vorpommern"
+Mecklenburg["Teilung"] = "Ost"
+
+
+Sachsen_Anhalt = zoom[zoom['BL'].str.contains('Anhalt')]
+Sachsen_Anhalt = Sachsen_Anhalt.mean()
+Sachsen_Anhalt["BL"] = "Sachsen-Anhalt"
+Sachsen_Anhalt["Teilung"] = "Ost"
+
+Thüringen = zoom[zoom['BL'].str.contains("Thüringen")]
+Thüringen = Thüringen.mean()
+Thüringen["BL"] = "Thüringen"
+Thüringen["Teilung"] = "Ost"
+
+Saarland = zoom[zoom['BL'].str.contains("Saarland")]
+Saarland = Saarland.mean()
+Saarland["BL"] = "Saarland"
+Saarland["Teilung"] = "West"
+
+Niedersachsen = zoom[zoom['BL'].str.contains('Niedersachsen')]
+Niedersachsen = Niedersachsen.mean()
+Niedersachsen["BL"] = "Niedersachsen"
+Niedersachsen["Teilung"] = "West"
+
+Nordrhein_Westfalen = zoom[zoom['BL'].str.contains('Westfalen')]
+Nordrhein_Westfalen = Nordrhein_Westfalen.mean()
+Nordrhein_Westfalen["BL"] = "Nordrhein-Westfalen"
+Nordrhein_Westfalen["Teilung"] = "West"
+
+Rheinland_Pfalz = zoom[zoom['BL'].str.contains('Rheinland')]
+Rheinland_Pfalz = Rheinland_Pfalz.mean()
+Rheinland_Pfalz["BL"] = "Rheinland-Pfalz"
+Rheinland_Pfalz["Teilung"] = "West"
+
+Berlin = zoom[zoom['BL'].str.contains('Berlin')]
+Berlin = Berlin.mean()
+Berlin["BL"] = "Berlin"
+Berlin["Teilung"] = "Ost"
+
+Schleswig_Holstein = zoom[zoom['BL'].str.contains('Holstein')]
+Schleswig_Holstein = Schleswig_Holstein.mean()
+Schleswig_Holstein["BL"] = "Schleswig-Holstein"
+Schleswig_Holstein["Teilung"] = "West"
+
+Bayern = zoom[zoom['BL'].str.contains('Bayern')]
+Bayern = Bayern.mean()
+Bayern["BL"] = "Bayern"
+Bayern["Teilung"] = "West"
+
+Baden_Württemberg = zoom[zoom['BL'].str.contains('Württemberg')]
+Baden_Württemberg = Baden_Württemberg.mean()
+Baden_Württemberg["BL"] = "Baden-Württemberg"
+Baden_Württemberg["Teilung"] = "West"
+
+Bremen = zoom[zoom['BL'].str.contains('Bremen')]
+Bremen = Bremen.mean()
+Bremen["BL"] = "Bremen"
+Bremen["Teilung"] = "West"
+
+Hamburg = zoom[zoom['BL'].str.contains("Hamburg")]
+Hamburg = Hamburg.mean()
+Hamburg["BL"] = "Hamburg"
+Hamburg["Teilung"] = "West"
+
+Hessen = zoom[zoom['BL'].str.contains("Hessen")]
+Hessen = Hessen.mean()
+Hessen["BL"] = "Hessen"
+Hessen["Teilung"] = "West"
+
+Alle Bundesländerdurchschnittswerete wieder zu einer Tabelle zusammenfassen, leere Spalten fallen lassen sowie die Speicherart einiger Spalten ändern, so dass Berechnungen erfolgen können. Außerdem Werte runden
+blall= pd.concat ([Brandenburg, Sachsen, Mecklenburg, Sachsen_Anhalt, Thüringen, Saarland, Niedersachsen, Hessen, Nordrhein_Westfalen, Rheinland_Pfalz, Schleswig_Holstein, Bayern, Baden_Württemberg, Berlin, Bremen, Hamburg], axis=1)
+blall = blall.T
+
+blall = blall.drop(columns=["Unnamed: 6", "Unnamed: 7", "Unnamed: 8",  "kr_inf_md_kum"])
+
+blall['tod'] = pd.to_numeric(blall['tod'])
+blall['GISD10_2012'] = pd.to_numeric(blall["GISD10_2012"])
+blall['krank'] = pd.to_numeric(blall["krank"])
+
+blall.tod = blall.tod.round(decimals = 1)
+blall.GISD10_2012 = blall.GISD10_2012.round(decimals = 1)
+blall.krank = blall.krank.round(decimals = 0)
+
+Ausschnitt für die Arbeit
+
+ks = blall[["BL", "GISD10_2012", "krank", "tod"]]
+ks = ks.rename(columns={"GISD10_2012": "GISD_2012","BL":"Bundesland", "tod": "Ø Tote auf 10.000 Einw.", "krank": "Ø Kranke auf 10.000 Einw."})
+Graphiken
+
+Graphik für Tote/Bundesland mit Ost/West-Verweis
+
+chart = alt.Chart(blall, title="Anzahl der Coronatoten auf 10.000 Einwohner*innen per Bundesland").mark_bar(size=15, opacity=1.0, cornerRadiusTopLeft=3,
+    cornerRadiusTopRight=3).encode(
+    x=alt.X('tod', title = "Corona-Tote pro 10.000 Einwohner*innen (Stichtag 31.12.2021)"),
+    y=alt.Y('BL', title = "Bundesland", sort = "x"),
+    color=alt.Color('Teilung', scale=alt.Scale(
+        domain=['West', "Ost"],
+        range=['green', 'blue'])),
+    #opacity=alt.Opacity("GISD10_2012", title = "GISD", scale=alt.Scale(domain=[1, 10])),
+).properties(
+    width=600,
+    height=400,
+    
+)
+
+rule = alt.Chart(blall).mark_rule(color='red').encode(
+    x=alt.X('mean(tod):Q')
+)
+
+
+#text = chart.mark_text(text="Abbildung 1: Durchschnittsanzahl der kumulierten Coronatoten am Stichtag 31.12.2021 auf Kreisebene sortiert nach GISD-Koeffizient ", dx=-20, dy=-5).encode(x=alt.datum(10), y=alt.datum(-5))
+grafik = chart 
+# + text
+
+Graphik Coronatote/Bundesland mit GISD
+chart = alt.Chart(blall, title="Anzahl der Coronatoten pro Bundesland nach aufsteigendem GISD").mark_bar(size=15, opacity=1.0, cornerRadiusTopLeft=3,
+    cornerRadiusTopRight=3).encode(
+    x=alt.X('tod', title = "Corona-Tote pro 10.000 Einwohner*innen (Stichtag 31.12.2021)"),
+    y=alt.Y('BL', title = "Bundesland", sort = "color"),
+    color=alt.Color('GISD10_2012', title = "GISD", scale=alt.Scale(scheme='goldgreen', domain=[10, 1])),
+).properties(
+    width=600,
+    height=400,
+   # title=alt.TitleParams(
+        #[" ", " ", "Abbildung 1: Durchschnittsanzahl der kumulierten Coronatoten pro 10.000 Einwohner*innen",  "am Stichtag 31.12.2021 auf Kreisebene zusammengefasst nach GISD-Koeffizient"],
+       # baseline='bottom',
+        #orient='bottom',
+       # anchor='end',
+        #fontWeight='normal',
+        #fontSize=13,    
+)
+
+rule = alt.Chart(blall).mark_rule(color='red').encode(
+    x=alt.X('mean(tod):Q')
+)
+
+#text = chart.mark_text(text="Abbildung 1: Durchschnittsanzahl der kumulierten Coronatoten am Stichtag 31.12.2021 auf Kreisebene sortiert nach GISD-Koeffizient ", dx=-20, dy=-5).encode(x=alt.datum(10), y=alt.datum(-5))
+grafik = chart 
+# + text
